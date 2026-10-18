@@ -60,6 +60,8 @@ footer{font-size:12px;color:var(--muted)}
 .route{margin:0;font-weight:700;font-variant-numeric:tabular-nums}
 .btn.solid{background:var(--fg);color:var(--bg);align-self:flex-start}
 .row{display:flex;flex-wrap:wrap;gap:8px}
+.chart.sm{min-height:180px}
+.opt .big{margin:4px 0 0}
 </style>
 </head>
 <body>
@@ -83,26 +85,30 @@ footer{font-size:12px;color:var(--muted)}
   </section>
 
   <section class="card" id="toronto">
-    <h2>多倫多出發 · 即時票價</h2>
-    <p class="sub">5/10 多倫多 → 倫敦，5/23 從巴黎回程。兩種回程方式，點按鈕就會開 Google Flights 看現在的價格。</p>
+    <h2>多倫多出發 · 每日記錄 + 即時票價</h2>
+    <p class="sub">5/10 多倫多 → 倫敦，5/23 從巴黎回程。每天下午跟台灣組一起自動記錄一次；想看當下價格就點按鈕。</p>
     <div class="opts">
       <div class="opt">
-        <p class="lab">方案 A · 回加拿大</p>
+        <p class="lab">方案 A · 回加拿大（一張多城市機票）</p>
         <p class="route">YYZ → LHR 5/10 · CDG → YYZ 5/23</p>
-        <p class="sub">一張多城市機票。10/18 查：加航每人約 CA$875，最低 CA$801（維珍）</p>
+        <p class="big" id="ga">—</p>
+        <p class="sub" id="gad">—</p>
+        <div class="chart sm" id="chartA"></div>
         <a class="btn solid" href="https://www.google.com/travel/flights/search?tfs=CBwQAhoeEgoyMDI3LTA1LTEwagcIARIDWVlacgcIARIDTEhSGh4SCjIwMjctMDUtMjNqBwgBEgNDREdyBwgBEgNZWVpAAUgBcAGCAQsI____________AZgBAw&amp;hl=zh-TW&amp;curr=CAD" target="_blank" rel="noopener">看方案 A 即時票價（加幣）</a>
       </div>
       <div class="opt">
-        <p class="lab">方案 B · 回台灣</p>
-        <p class="route">YYZ → LHR 5/10 單程 ＋ CDG → TPE 5/23 單程</p>
-        <p class="sub">兩張單程票分開買。10/18 查：去程英航約 CA$606，回程阿提哈德約 NT$16,701</p>
+        <p class="lab">方案 B · 回台灣（兩張單程）</p>
+        <p class="route">YYZ → LHR 5/10 ＋ CDG → TPE 5/23</p>
+        <p class="big" id="gb">—</p>
+        <p class="sub" id="gbd">—</p>
+        <div class="chart sm" id="chartB"></div>
         <div class="row">
           <a class="btn solid" href="https://www.google.com/travel/flights?q=Flights%20to%20LHR%20from%20YYZ%20on%202027-05-10%20oneway&amp;curr=CAD&amp;hl=zh-TW" target="_blank" rel="noopener">去程（加幣）</a>
           <a class="btn solid" href="https://www.google.com/travel/flights?q=Flights%20to%20TPE%20from%20CDG%20on%202027-05-23%20oneway&amp;curr=TWD&amp;hl=zh-TW" target="_blank" rel="noopener">回程（台幣）</a>
         </div>
       </div>
     </div>
-    <p class="sub">多倫多出發的價格不會每天自動記錄，參考價是 2026/10/18 查的，以按鈕打開的即時價格為準。</p>
+    <p class="sub">都是每人、含稅、全部航空裡最便宜的那班。方案 B 的走勢圖畫的是去程（加幣），回程阿提哈德另外寫在下面。</p>
   </section>
 
   <section class="card">
@@ -125,7 +131,7 @@ footer{font-size:12px;color:var(--muted)}
   <section class="card">
     <h2>每日紀錄</h2>
     <div class="tbl"><table>
-      <thead><tr><th>日期</th><th class="n">阿提哈德</th><th class="n hn">全部航空最低</th><th class="hn">最低的航空</th><th class="hn">備註</th></tr></thead>
+      <thead><tr><th>日期</th><th class="n">阿提哈德</th><th class="n hn">全部航空最低</th><th class="hn">最低的航空</th><th class="n hn">女友 A</th><th class="n hn">女友 B 去／回</th><th class="hn">備註</th></tr></thead>
       <tbody id="rows"></tbody>
     </table></div>
   </section>
@@ -140,6 +146,7 @@ footer{font-size:12px;color:var(--muted)}
 <script>
 const TARGET = 28000;
 const nt = (v) => 'NT$' + Number(v).toLocaleString('en-US');
+const ca = (v) => 'CA$' + Number(v).toLocaleString('en-US');
 const $ = (id) => document.getElementById(id);
 const css = (n) => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
 
@@ -154,17 +161,20 @@ function stats(rows) {
   return { cur, lo, hi, s, t };
 }
 
-function drawChart(rows) {
-  const box = $('chart'); box.replaceChildren();
-  const W = Math.max(320, box.clientWidth), H = 260, ns = 'http://www.w3.org/2000/svg';
-  const vals = rows.map((r) => r.p).concat(TARGET);
+function drawChart(rows, opt) {
+  opt = Object.assign({ id: 'chart', fmt: nt, label: '阿提哈德', target: TARGET, H: 260 }, opt || {});
+  const fmtv = opt.fmt;
+  const box = $(opt.id); box.replaceChildren();
+  if (!rows.length) return;
+  const W = Math.max(280, box.clientWidth), H = opt.H, ns = 'http://www.w3.org/2000/svg';
+  const vals = rows.map((r) => r.p).concat(opt.target == null ? [] : [opt.target]);
   let min = Math.min(...vals) * 0.97, max = Math.max(...vals) * 1.03;
-  const step = Math.pow(10, Math.floor(Math.log10((max - min) / 4)));
+  const step = Math.pow(10, Math.floor(Math.log10(Math.max(1, (max - min) / 4))));
   min = Math.floor(min / step) * step; max = Math.ceil(max / step) * step;
   const svg = document.createElementNS(ns, 'svg'); svg.setAttribute('viewBox', `0 0 ${W} ${H}`); box.append(svg);
   const el = (t, a, txt) => { const e = document.createElementNS(ns, t); for (const k in a) e.setAttribute(k, a[k]); if (txt != null) e.textContent = txt; svg.append(e); return e; };
   const ticks = []; const tstep = (max - min) / 4; for (let i = 0; i <= 4; i++) ticks.push(min + tstep * i);
-  const probe = el('text', { 'font-size': 12 }, nt(Math.round(max))); const ml = Math.max(70, probe.getComputedTextLength() + 14); probe.remove();
+  const probe = el('text', { 'font-size': 12 }, fmtv(Math.round(max))); const ml = Math.max(70, probe.getComputedTextLength() + 14); probe.remove();
   const mr = 16, mt = 12, mb = 28;
   const t0 = new Date(rows[0].date).getTime();
   const t1 = rows.length > 1 ? new Date(rows[rows.length - 1].date).getTime() : t0 + 7 * 864e5;
@@ -173,21 +183,21 @@ function drawChart(rows) {
   const grid = css('--line'), muted = css('--muted'), acc = css('--accent'), ref = css('--ref');
   ticks.forEach((v) => {
     el('line', { x1: ml, x2: W - mr, y1: y(v), y2: y(v), stroke: grid });
-    el('text', { x: ml - 8, y: y(v), dy: '0.32em', 'text-anchor': 'end', 'font-size': 12, fill: muted }, nt(Math.round(v)));
+    el('text', { x: ml - 8, y: y(v), dy: '0.32em', 'text-anchor': 'end', 'font-size': 12, fill: muted }, fmtv(Math.round(v)));
   });
   const nx = Math.max(2, Math.min(6, Math.floor(W / 110)));
   for (let i = 0; i < nx; i++) {
     const tt = t0 + (t1 - t0) * i / (nx - 1); const d = new Date(tt);
     el('text', { x: x(d), y: H - 8, 'text-anchor': i === 0 ? 'start' : i === nx - 1 ? 'end' : 'middle', 'font-size': 12, fill: muted }, `${d.getUTCMonth() + 1}/${d.getUTCDate()}`);
   }
-  el('line', { x1: ml, x2: W - mr, y1: y(TARGET), y2: y(TARGET), stroke: ref, 'stroke-dasharray': '4 4' });
+  if (opt.target != null) el('line', { x1: ml, x2: W - mr, y1: y(opt.target), y2: y(opt.target), stroke: ref, 'stroke-dasharray': '4 4' });
   el('path', { d: rows.map((r, i) => (i ? 'L' : 'M') + x(r.date) + ',' + y(r.p)).join(''), fill: 'none', stroke: acc, 'stroke-width': 2, 'stroke-linecap': 'round', 'stroke-linejoin': 'round' });
   rows.forEach((r) => el('circle', { cx: x(r.date), cy: y(r.p), r: rows.length > 30 ? 2 : 4, fill: acc }));
   const tip = document.createElement('div'); tip.className = 'tip'; tip.hidden = true; box.append(tip);
   svg.addEventListener('pointermove', (ev) => {
     const rect = svg.getBoundingClientRect(); const k = rect.width / W; const mx = (ev.clientX - rect.left) / k;
     let best = rows[0]; rows.forEach((r) => { if (Math.abs(x(r.date) - mx) < Math.abs(x(best.date) - mx)) best = r; });
-    tip.replaceChildren(Object.assign(document.createElement('div'), { className: 'd', textContent: best.date }), Object.assign(document.createElement('div'), { textContent: '阿提哈德 ' + nt(best.p) }));
+    tip.replaceChildren(Object.assign(document.createElement('div'), { className: 'd', textContent: best.date }), Object.assign(document.createElement('div'), { textContent: opt.label + ' ' + fmtv(best.p) }));
     tip.hidden = false;
     tip.style.left = Math.min(Math.max(x(best.date) * k - 60, 0), rect.width - 150) + 'px';
     tip.style.top = Math.max(y(best.p) * k - 56, 0) + 'px';
@@ -212,12 +222,25 @@ function render() {
   const tb = $('rows'); tb.replaceChildren();
   DATA.slice().sort((a, b) => a.date < b.date ? 1 : -1).forEach((r) => {
     const tr = document.createElement('tr');
-    [[String(r.date).slice(0, 10), ''], [r.etihad ? nt(r.etihad) : '—', 'n'], [r.cheapest ? nt(r.cheapest) : '—', 'n hn'], [r.cheapest_airline || '—', 'hn'], [r.note || '', 'hn']].forEach(([t, c]) => {
+    [[String(r.date).slice(0, 10), ''], [r.etihad ? nt(r.etihad) : '—', 'n'], [r.cheapest ? nt(r.cheapest) : '—', 'n hn'], [r.cheapest_airline || '—', 'hn'], [r.gf_a ? ca(r.gf_a) : '—', 'n hn'], [r.gf_b_out ? ca(r.gf_b_out) + ' / ' + (r.gf_b_ret ? nt(r.gf_b_ret) : '—') : '—', 'n hn'], [r.note || '', 'hn']].forEach(([t, c]) => {
       const td = document.createElement('td'); td.textContent = t; if (c) td.className = c; tr.append(td);
     });
     tb.append(tr);
   });
   drawChart(rows);
+  const all = DATA.map((r) => ({ ...r, date: String(r.date).slice(0, 10) })).sort((a, b) => a.date < b.date ? -1 : 1);
+  const series = (k) => all.filter((r) => Number(r[k]) > 0).map((r) => ({ ...r, p: Number(r[k]) }));
+  const A = series('gf_a'), B = series('gf_b_out'), R = series('gf_b_ret');
+  const lowOf = (xs) => xs.reduce((m, r) => (r.p < m.p ? r : m), xs[0]);
+  if (A.length) { const c = A[A.length - 1], l = lowOf(A); $('ga').textContent = ca(c.p); $('gad').textContent = `${c.date} · ${c.gf_a_airline || ''} · 追蹤最低 ${ca(l.p)}（${l.date}）`; }
+  else { $('ga').textContent = '—'; $('gad').textContent = '明天下午開始累積紀錄'; }
+  if (B.length) {
+    const c = B[B.length - 1], l = lowOf(B); const rc = R.length ? R[R.length - 1] : null;
+    $('gb').textContent = ca(c.p) + (rc ? ' ＋ ' + nt(rc.p) : '');
+    $('gbd').textContent = `去程 ${c.gf_b_out_airline || ''} 追蹤最低 ${ca(l.p)}（${l.date}）` + (R.length ? ` · 回程阿提哈德最低 ${nt(lowOf(R).p)}` : '');
+  } else { $('gb').textContent = '—'; $('gbd').textContent = '明天下午開始累積紀錄'; }
+  drawChart(A, { id: 'chartA', fmt: ca, label: '方案 A', target: null, H: 180 });
+  drawChart(B, { id: 'chartB', fmt: ca, label: '去程', target: null, H: 180 });
 }
 fetch('prices.json?v=' + Date.now(), { cache: 'no-store' }).then((r) => r.json()).then((d) => { DATA = Array.isArray(d) ? d : (d.rows || []); render(); }).catch(() => { $('sigt').textContent = '資料讀取失敗，稍後再重新整理'; });
 let rt; addEventListener('resize', () => { clearTimeout(rt); rt = setTimeout(() => DATA.length && render(), 150); });
