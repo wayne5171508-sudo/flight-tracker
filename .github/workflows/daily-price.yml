@@ -1,0 +1,31 @@
+name: Daily flight price check
+on:
+  schedule:
+    - cron: '0 6 * * *'   # 14:00 Taipei; GitHub may start it a little late
+  workflow_dispatch:
+permissions:
+  contents: write
+concurrency:
+  group: prices
+  cancel-in-progress: false
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - run: npm install --no-save playwright@1.47.2
+      - run: npx playwright install --with-deps chromium
+      - run: node scripts/scrape.mjs
+      - name: Commit prices.json
+        run: |
+          git config user.name "flight-bot"
+          git config user.email "flight-bot@users.noreply.github.com"
+          git add prices.json
+          git diff --cached --quiet && echo "no change" && exit 0
+          git commit -m "每日查價 $(TZ=Asia/Taipei date +%F)"
+          git pull --rebase
+          git push
