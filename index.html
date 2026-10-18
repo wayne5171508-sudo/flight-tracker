@@ -55,13 +55,18 @@ footer{font-size:12px;color:var(--muted)}
 .btn.ghost{background:transparent;color:var(--bg);border:1px solid currentColor}
 .btn:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
 .age{font-size:13px;opacity:.8}
+.opts{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,260px),1fr));gap:12px;margin:10px 0}
+.opt{border:1px solid var(--line);border-radius:10px;padding:14px 16px;display:flex;flex-direction:column;gap:6px;min-width:0}
+.route{margin:0;font-weight:700;font-variant-numeric:tabular-nums}
+.btn.solid{background:var(--fg);color:var(--bg);align-self:flex-start}
+.row{display:flex;flex-wrap:wrap;gap:8px}
 </style>
 </head>
 <body>
 <div class="wrap">
   <header class="board">
     <h1>機票價格追蹤</h1>
-    <div class="legs"><span>TPE → LHR · 2027/05/10</span><span>CDG → TPE · 2027/05/23</span><span>經濟艙 · 每人含稅</span></div>
+    <div class="legs"><span>台灣出發 3 人</span><span>TPE → LHR · 2027/05/10</span><span>CDG → TPE · 2027/05/23</span><span>經濟艙 · 每人含稅</span></div>
     <p class="sig" id="sig"><span class="dot"></span><span id="sigt">讀取中…</span></p>
     <p class="age" id="age">—</p>
     <div class="acts">
@@ -75,6 +80,29 @@ footer{font-size:12px;color:var(--muted)}
     <div class="card"><p class="lab">追蹤以來最低</p><p class="big" id="low">—</p><p class="sub" id="lowd">—</p></div>
     <div class="card"><p class="lab">追蹤以來最高</p><p class="big" id="high">—</p><p class="sub" id="highd">—</p></div>
     <div class="card"><p class="lab">3 人合計（今天）</p><p class="big" id="tot">—</p><p class="sub"><span id="days">—</span> 天紀錄</p></div>
+  </section>
+
+  <section class="card" id="toronto">
+    <h2>多倫多出發 · 即時票價</h2>
+    <p class="sub">5/10 多倫多 → 倫敦，5/23 從巴黎回程。兩種回程方式，點按鈕就會開 Google Flights 看現在的價格。</p>
+    <div class="opts">
+      <div class="opt">
+        <p class="lab">方案 A · 回加拿大</p>
+        <p class="route">YYZ → LHR 5/10 · CDG → YYZ 5/23</p>
+        <p class="sub">一張多城市機票。10/18 查：加航每人約 CA$875，最低 CA$801（維珍）</p>
+        <a class="btn solid" href="https://www.google.com/travel/flights/search?tfs=CBwQAhoeEgoyMDI3LTA1LTEwagcIARIDWVlacgcIARIDTEhSGh4SCjIwMjctMDUtMjNqBwgBEgNDREdyBwgBEgNZWVpAAUgBcAGCAQsI____________AZgBAw&amp;hl=zh-TW&amp;curr=CAD" target="_blank" rel="noopener">看方案 A 即時票價（加幣）</a>
+      </div>
+      <div class="opt">
+        <p class="lab">方案 B · 回台灣</p>
+        <p class="route">YYZ → LHR 5/10 單程 ＋ CDG → TPE 5/23 單程</p>
+        <p class="sub">兩張單程票分開買。10/18 查：去程英航約 CA$606，回程阿提哈德約 NT$16,701</p>
+        <div class="row">
+          <a class="btn solid" href="https://www.google.com/travel/flights?q=Flights%20to%20LHR%20from%20YYZ%20on%202027-05-10%20oneway&amp;curr=CAD&amp;hl=zh-TW" target="_blank" rel="noopener">去程（加幣）</a>
+          <a class="btn solid" href="https://www.google.com/travel/flights?q=Flights%20to%20TPE%20from%20CDG%20on%202027-05-23%20oneway&amp;curr=TWD&amp;hl=zh-TW" target="_blank" rel="noopener">回程（台幣）</a>
+        </div>
+      </div>
+    </div>
+    <p class="sub">多倫多出發的價格不會每天自動記錄，參考價是 2026/10/18 查的，以按鈕打開的即時價格為準。</p>
   </section>
 
   <section class="card">
