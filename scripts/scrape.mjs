@@ -18,13 +18,23 @@ async function results(page, url) {
     const b = page.getByRole('button', { name: label });
     if (await b.count()) { await b.first().click().catch(() => {}); break; }
   }
-  await page.waitForFunction(() => /(NT|CA)\$[\d,]+/.test(document.body.innerText) && /\d+ hr/.test(document.body.innerText), null, { timeout: 45000 });
+  // Google's results page enforces Trusted Types, so poll with evaluate() instead of waitForFunction().
+  const ready = () => page.evaluate(() => /(NT|CA)\$[\d,]+/.test(document.body.innerText) && /\d+ hr/.test(document.body.innerText)).catch(() => false);
+  const t0 = Date.now();
+  while (!(await ready())) {
+    if (Date.now() - t0 > 45000) throw new Error('timeout waiting for prices');
+    await page.waitForTimeout(1500);
+  }
   await page.waitForTimeout(3000);
-  const items = await page.$$eval('li', (lis) => lis.map((li) => li.innerText).filter((t) => /(NT|CA)\$[\d,]+/.test(t) && /\d+ hr/.test(t)));
-  return items.map((t) => {
+  const items = await page.$$eval('li', (lis) => lis.map((li) => {
+    const lab = [...li.querySelectorAll('[aria-label]')].map((e) => e.getAttribute('aria-label')).find((a) => /flight with /.test(a)) || '';
+    return { t: li.innerText, lab };
+  }).filter(({ t }) => /(NT|CA)\$[\d,]+/.test(t) && /\d+ hr/.test(t)));
+  return items.map(({ t, lab }) => {
     const lines = t.split('\n').map((x) => x.trim()).filter(Boolean);
     const dash = lines.findIndex((x) => x === '–' || x === '-');
-    const airline = dash >= 0 ? (lines[dash + 2] || '') : '';
+    const m = lab.match(/flight with (.+?)\./);
+    const airline = m ? m[1].replace(/ and /g, ', ') : (dash >= 0 ? (lines[dash + 2] || '') : '');
     const price = num((t.match(/(?:NT|CA)\$[\d,]+/) || ['0'])[0]);
     return { text: t, airline, price, etihadAuh: /Etihad/.test(t) && /AUH/.test(t) };
   }).filter((r) => r.price > 0);
