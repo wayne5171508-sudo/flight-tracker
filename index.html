@@ -141,7 +141,7 @@ footer{font-size:12px;color:var(--muted)}
     <p class="sub">iPhone：用 Safari 開這頁 → 下方「分享」→「加入主畫面」。Android：Chrome 右上角「⋮」→「加到主畫面」。之後點圖示就會直接打開。</p>
   </section>
 
-  <footer>每天台灣時間下午約 2:50 自動更新 · 最後更新：<span id="upd">—</span></footer>
+  <footer>每天台灣時間下午 2 點多自動更新，不用開電腦 · 最後更新：<span id="upd">—</span></footer>
 </div>
 <script>
 const TARGET = 28000;
@@ -218,7 +218,7 @@ function render() {
   $('upd').textContent = st.cur.date;
   const today = new Date(Date.now() + 8 * 3600e3).toISOString().slice(0, 10);
   const lag = Math.round((new Date(today) - new Date(st.cur.date)) / 864e5);
-  $('age').textContent = lag <= 0 ? '今天已更新' : lag === 1 ? '最新紀錄是昨天，今天下午 2:50 後更新' : `最新紀錄是 ${lag} 天前，可能有幾天沒查到價格`;
+  $('age').textContent = lag <= 0 ? '今天已更新' : lag === 1 ? '最新紀錄是昨天，今天下午 2 點多更新' : `最新紀錄是 ${lag} 天前，可能有幾天沒查到價格`;
   const tb = $('rows'); tb.replaceChildren();
   DATA.slice().sort((a, b) => a.date < b.date ? 1 : -1).forEach((r) => {
     const tr = document.createElement('tr');
