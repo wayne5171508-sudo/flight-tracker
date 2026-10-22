@@ -39,17 +39,35 @@ async function results(page, url) {
     return { text: t, airline, price, etihadAuh: /Etihad/.test(t) && /AUH/.test(t) };
   }).filter((r) => r.price > 0);
 }
+// Google Flights 偶爾載入失敗(10/19、10/21 都有一半查詢逾時)。每組最多試 3 次,每次換新分頁、間隔拉長。
+async function resultsRetry(ctx, url, label) {
+  let lastErr;
+  for (let attempt = 1; attempt <= 3; attempt++) {
+    const pg = await ctx.newPage();
+    try {
+      const r = await results(pg, url);
+      if (r.length) return r;
+      lastErr = new Error('no rows');
+    } catch (err) {
+      lastErr = err;
+      console.error(label, 'attempt', attempt, err.message);
+    } finally {
+      await pg.close().catch(() => {});
+    }
+    await new Promise((res) => setTimeout(res, 5000 * attempt));
+  }
+  throw lastErr;
+}
 const cheapest = (rs) => rs.reduce((m, r) => (!m || r.price < m.price ? r : m), null);
 
 const today = new Date(Date.now() + 8 * 3600e3).toISOString().slice(0, 10);
 const browser = await chromium.launch();
 const ctx = await browser.newContext({ locale: 'en-US', userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36' });
-const page = await ctx.newPage();
 const row = { date: today, note: 'GitHub 自動查價' };
 const notes = [];
 
 try {
-  const r = await results(page, S.tw);
+  const r = await resultsRetry(ctx, S.tw, 'tw');
   const e = cheapest(r.filter((x) => x.etihadAuh));
   const c = cheapest(r);
   if (e) row.etihad = e.price; else notes.push('台灣組找不到阿提哈德');
@@ -62,7 +80,7 @@ for (const [key, url, field, airField, etihadOnly] of [
   ['gfBret', S.gfBret, 'gf_b_ret', null, true],
 ]) {
   try {
-    const r = await results(page, url);
+    const r = await resultsRetry(ctx, url, key);
     let pick = etihadOnly ? cheapest(r.filter((x) => x.etihadAuh)) : null;
     if (!pick) { pick = cheapest(r); if (etihadOnly && pick) notes.push('回程找不到阿提哈德，記最低價'); }
     if (pick) { row[field] = pick.price; if (airField) row[airField] = pick.airline; }
@@ -79,6 +97,19 @@ if (!row.etihad && !row.cheapest && !row.gf_a && !row.gf_b_out && !row.gf_b_ret)
 const file = 'prices.json';
 const data = JSON.parse(fs.readFileSync(file, 'utf8'));
 const i = data.findIndex((r) => String(r.date).slice(0, 10) === today);
-if (i >= 0) data[i] = { ...data[i], ...row }; else data.push(row);
+if (i >= 0) {
+  // 同一天跑第二次(手動補跑):這次失敗的組別保留稍早成功的價格,備註也不要寫成「查詢失敗」
+  const prev = data[i];
+  const kept = [];
+  for (const [f, label] of [['etihad', '台灣組'], ['gf_a', 'gfA'], ['gf_b_out', 'gfBout'], ['gf_b_ret', 'gfBret']]) {
+    if (row[f] == null && prev[f] != null) kept.push(label);
+  }
+  data[i] = { ...prev, ...row };
+  if (kept.length) {
+    let note = row.note;
+    for (const k of kept) note = note.replace('；' + (k === '台灣組' ? '台灣組查詢失敗' : k + ' 查詢失敗'), '');
+    data[i].note = note + '；' + kept.join('、') + '沿用今天稍早的價格';
+  }
+} else data.push(row);
 data.sort((a, b) => (a.date < b.date ? -1 : 1));
 fs.writeFileSync(file, JSON.stringify(data, null, 0) + '\n');
