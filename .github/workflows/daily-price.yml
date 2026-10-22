@@ -1,7 +1,11 @@
 name: Daily flight price check
 on:
   schedule:
-    - cron: '0 6 * * *'   # 14:00 Taipei; GitHub may start it a little late
+    # GitHub 排程在這個 repo 實際會晚 4~5 小時才開跑(14:00 的排程常到 18:40 才跑),
+    # 導致 Claude 14:50 的同步任務每天都等不到資料、只好自己開 Chrome 重查一次。
+    # 改成 09:00 先跑一次,13:00 再補一次(同一天第二次會保留成功的價格),14:50 前通常就有資料。
+    - cron: '0 1 * * *'   # 09:00 Taipei
+    - cron: '0 5 * * *'   # 13:00 Taipei
   workflow_dispatch:
 permissions:
   contents: write
