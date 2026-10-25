@@ -1,0 +1,250 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>機票價格追蹤</title>
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="icon" href="icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="機票追蹤">
+<meta name="theme-color" content="#16202E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&family=Noto+Serif+TC:wght@600&display=swap">
+<style>
+/* Layout: one column, departure-board header, tiles, chart, rules, log */
+:root{
+  --bg:#F3F5F8; --panel:#FFFFFF; --fg:#16202E; --muted:#5B6676; --line:#DCE2EA;
+  --accent:#2D5B8A; --ok:#1F7A4D; --warn:#A86A00; --bad:#B23A2E; --ref:#8A96A6;
+  --sans:'Noto Sans TC',system-ui,-apple-system,'PingFang TC',sans-serif;
+  --serif:'Noto Serif TC','Songti TC',Georgia,serif;
+}
+@media (prefers-color-scheme: dark){:root{
+  --bg:#0F1620; --panel:#17212D; --fg:#E8EDF3; --muted:#9AA6B5; --line:#2A3746;
+  --accent:#7FB0E0; --ok:#5CC08A; --warn:#E0A84A; --bad:#EF7B6E; --ref:#6B7889; color-scheme:dark}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--fg);font:15px/1.6 var(--sans)}
+.wrap{max-width:960px;margin:0 auto;padding-block:32px 48px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));display:flex;flex-direction:column;gap:20px}
+.board{background:var(--fg);color:var(--bg);border-radius:14px;padding:20px 24px;display:flex;flex-direction:column;gap:6px}
+.board h1{font-family:var(--serif);font-size:clamp(24px,5vw,34px);margin:0;text-wrap:balance}
+.legs{display:flex;flex-wrap:wrap;gap:8px 20px;font-size:14px;letter-spacing:.04em;opacity:.85;font-variant-numeric:tabular-nums}
+.sig{display:inline-flex;align-items:center;gap:10px;font-weight:700;font-size:18px;margin-top:6px}
+.dot{width:12px;height:12px;border-radius:50%;background:var(--ref)}
+.sig[data-s=buy] .dot{background:var(--ok)}.sig[data-s=watch] .dot{background:var(--warn)}.sig[data-s=wait] .dot{background:var(--bad)}
+.tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,150px),1fr));gap:12px}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:16px 18px;min-width:0}
+.lab{margin:0;font-size:13px;color:var(--muted);letter-spacing:.03em}
+.big{margin:2px 0 0;font-family:var(--serif);font-size:clamp(22px,6vw,28px);font-variant-numeric:tabular-nums}
+.sub{margin:0;font-size:13px;color:var(--muted)}
+h2{font-size:17px;margin:0 0 4px}
+.chart{position:relative;min-height:260px}
+.chart svg{display:block;width:100%;height:auto}
+.tip{position:absolute;pointer-events:none;background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:4px 10px;font-size:13px;white-space:nowrap;box-shadow:0 4px 14px rgba(0,0,0,.12)}
+.tip .d{color:var(--muted)}
+ul{margin:6px 0 0;padding-left:1.2em;display:flex;flex-direction:column;gap:4px}
+.tbl{overflow-x:auto;max-height:420px}
+table{width:100%;border-collapse:collapse;font-variant-numeric:tabular-nums}
+th,td{text-align:left;padding:8px 10px;border-bottom:1px solid var(--line);white-space:nowrap}
+th{position:sticky;top:0;background:var(--panel);font-weight:500;color:var(--muted);font-size:13px}
+td.n,th.n{text-align:right}
+@media (max-width:560px){.hn{display:none}}
+footer{font-size:12px;color:var(--muted)}
+.acts{display:flex;flex-wrap:wrap;gap:10px;margin-top:10px}
+.btn{display:inline-flex;align-items:center;justify-content:center;min-height:44px;padding:0 18px;border-radius:999px;font-weight:700;font-size:15px;text-decoration:none;background:var(--bg);color:var(--fg)}
+.btn.ghost{background:transparent;color:var(--bg);border:1px solid currentColor}
+.btn:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+.age{font-size:13px;opacity:.8}
+.opts{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,260px),1fr));gap:12px;margin:10px 0}
+.opt{border:1px solid var(--line);border-radius:10px;padding:14px 16px;display:flex;flex-direction:column;gap:6px;min-width:0}
+.route{margin:0;font-weight:700;font-variant-numeric:tabular-nums}
+.btn.solid{background:var(--fg);color:var(--bg);align-self:flex-start}
+.row{display:flex;flex-wrap:wrap;gap:8px}
+.chart.sm{min-height:180px}
+.opt .big{margin:4px 0 0}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="board">
+    <h1>機票價格追蹤</h1>
+    <div class="legs"><span>台灣出發 3 人</span><span>TPE → LHR · 2027/05/10</span><span>CDG → TPE · 2027/05/23</span><span>經濟艙 · 每人含稅</span></div>
+    <p class="sig" id="sig"><span class="dot"></span><span id="sigt">讀取中…</span></p>
+    <p class="age" id="age">—</p>
+    <div class="acts">
+      <a class="btn" href="https://www.google.com/travel/flights/search?tfs=CBwQAhojEgoyMDI3LTA1LTEwagwIAhIIL20vMGZ0a3hyBwgBEgNMSFIaIxIKMjAyNy0wNS0yM2oHCAESA0NER3IMCAISCC9tLzBmdGt4QAFIAXABggELCP___________wGYAQM&amp;hl=zh-TW&amp;curr=TWD" target="_blank" rel="noopener">看現在的即時票價</a>
+      <a class="btn ghost" href="https://www.etihad.com" target="_blank" rel="noopener">阿提哈德官網</a>
+    </div>
+  </header>
+
+  <section class="tiles">
+    <div class="card"><p class="lab">今天 · 阿提哈德每人</p><p class="big" id="cur">—</p><p class="sub" id="curd">—</p></div>
+    <div class="card"><p class="lab">追蹤以來最低</p><p class="big" id="low">—</p><p class="sub" id="lowd">—</p></div>
+    <div class="card"><p class="lab">追蹤以來最高</p><p class="big" id="high">—</p><p class="sub" id="highd">—</p></div>
+    <div class="card"><p class="lab">3 人合計（今天）</p><p class="big" id="tot">—</p><p class="sub"><span id="days">—</span> 天紀錄</p></div>
+  </section>
+
+  <section class="card" id="toronto">
+    <h2>多倫多出發 · 每日記錄 + 即時票價</h2>
+    <p class="sub">5/10 多倫多 → 倫敦，5/23 從巴黎回程。每天下午跟台灣組一起自動記錄一次；想看當下價格就點按鈕。</p>
+    <div class="opts">
+      <div class="opt">
+        <p class="lab">方案 A · 回加拿大（一張多城市機票）</p>
+        <p class="route">YYZ → LHR 5/10 · CDG → YYZ 5/23</p>
+        <p class="big" id="ga">—</p>
+        <p class="sub" id="gad">—</p>
+        <div class="chart sm" id="chartA"></div>
+        <a class="btn solid" href="https://www.google.com/travel/flights/search?tfs=CBwQAhoeEgoyMDI3LTA1LTEwagcIARIDWVlacgcIARIDTEhSGh4SCjIwMjctMDUtMjNqBwgBEgNDREdyBwgBEgNZWVpAAUgBcAGCAQsI____________AZgBAw&amp;hl=zh-TW&amp;curr=CAD" target="_blank" rel="noopener">看方案 A 即時票價（加幣）</a>
+      </div>
+      <div class="opt">
+        <p class="lab">方案 B · 回台灣（兩張單程）</p>
+        <p class="route">YYZ → LHR 5/10 ＋ CDG → TPE 5/23</p>
+        <p class="big" id="gb">—</p>
+        <p class="sub" id="gbd">—</p>
+        <div class="chart sm" id="chartB"></div>
+        <div class="row">
+          <a class="btn solid" href="https://www.google.com/travel/flights?q=Flights%20to%20LHR%20from%20YYZ%20on%202027-05-10%20oneway&amp;curr=CAD&amp;hl=zh-TW" target="_blank" rel="noopener">去程（加幣）</a>
+          <a class="btn solid" href="https://www.google.com/travel/flights?q=Flights%20to%20TPE%20from%20CDG%20on%202027-05-23%20oneway&amp;curr=TWD&amp;hl=zh-TW" target="_blank" rel="noopener">回程（台幣）</a>
+        </div>
+      </div>
+    </div>
+    <p class="sub">都是每人、含稅、全部航空裡最便宜的那班。方案 B 的走勢圖畫的是去程（加幣），回程阿提哈德另外寫在下面。</p>
+  </section>
+
+  <section class="card">
+    <h2>每人票價走勢</h2>
+    <p class="sub">實線：阿提哈德最低價 · 虛線：目標價 NT$28,000</p>
+    <div class="chart" id="chart"></div>
+  </section>
+
+  <section class="card">
+    <h2>什麼時候買</h2>
+    <ul>
+      <li><b>可以買</b>：今天低於目標價 NT$28,000，或紀錄滿 14 天後出現追蹤以來最低價。</li>
+      <li><b>觀察</b>：比最低價高不到 5%。</li>
+      <li><b>先別買</b>：比最低價高 5% 以上。</li>
+      <li>2027/2/1 起不再等，直接買。</li>
+    </ul>
+    <p class="sub" style="margin-top:8px">目標價和截止日是自訂的規劃門檻。價格來自 Google Flights 多城市搜尋（1 位成人），不一定含託運行李，下單前在航空公司官網確認。</p>
+  </section>
+
+  <section class="card">
+    <h2>每日紀錄</h2>
+    <div class="tbl"><table>
+      <thead><tr><th>日期</th><th class="n">阿提哈德</th><th class="n hn">全部航空最低</th><th class="hn">最低的航空</th><th class="n hn">女友 A</th><th class="n hn">女友 B 去／回</th><th class="hn">備註</th></tr></thead>
+      <tbody id="rows"></tbody>
+    </table></div>
+  </section>
+
+  <section class="card">
+    <h2>放到手機主畫面</h2>
+    <p class="sub">iPhone：用 Safari 開這頁 → 下方「分享」→「加入主畫面」。Android：Chrome 右上角「⋮」→「加到主畫面」。之後點圖示就會直接打開。</p>
+  </section>
+
+  <footer>每天台灣時間下午 2 點多自動更新，不用開電腦 · 最後更新：<span id="upd">—</span></footer>
+</div>
+<script>
+const TARGET = 28000;
+const nt = (v) => 'NT$' + Number(v).toLocaleString('en-US');
+const ca = (v) => 'CA$' + Number(v).toLocaleString('en-US');
+const $ = (id) => document.getElementById(id);
+const css = (n) => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+
+function stats(rows) {
+  const cur = rows[rows.length - 1];
+  let lo = rows[0], hi = rows[0];
+  rows.forEach((r) => { if (r.p <= lo.p) lo = r; if (r.p > hi.p) hi = r; });
+  let s = 'wait', t = '先別買：比最低價高 5% 以上';
+  if (cur.date >= '2027-02-01') { s = 'buy'; t = '該買了：已到 2/1 截止日'; }
+  else if (cur.p <= TARGET || (rows.length >= 14 && cur.p <= lo.p)) { s = 'buy'; t = '可以買：今天是買點'; }
+  else if (cur.p <= lo.p * 1.05) { s = 'watch'; t = rows.length < 14 ? '觀察中：紀錄未滿 14 天，先累積資料' : '觀察：接近最低價'; }
+  return { cur, lo, hi, s, t };
+}
+
+function drawChart(rows, opt) {
+  opt = Object.assign({ id: 'chart', fmt: nt, label: '阿提哈德', target: TARGET, H: 260 }, opt || {});
+  const fmtv = opt.fmt;
+  const box = $(opt.id); box.replaceChildren();
+  if (!rows.length) return;
+  const W = Math.max(280, box.clientWidth), H = opt.H, ns = 'http://www.w3.org/2000/svg';
+  const vals = rows.map((r) => r.p).concat(opt.target == null ? [] : [opt.target]);
+  let min = Math.min(...vals) * 0.97, max = Math.max(...vals) * 1.03;
+  const step = Math.pow(10, Math.floor(Math.log10(Math.max(1, (max - min) / 4))));
+  min = Math.floor(min / step) * step; max = Math.ceil(max / step) * step;
+  const svg = document.createElementNS(ns, 'svg'); svg.setAttribute('viewBox', `0 0 ${W} ${H}`); box.append(svg);
+  const el = (t, a, txt) => { const e = document.createElementNS(ns, t); for (const k in a) e.setAttribute(k, a[k]); if (txt != null) e.textContent = txt; svg.append(e); return e; };
+  const ticks = []; const tstep = (max - min) / 4; for (let i = 0; i <= 4; i++) ticks.push(min + tstep * i);
+  const probe = el('text', { 'font-size': 12 }, fmtv(Math.round(max))); const ml = Math.max(70, probe.getComputedTextLength() + 14); probe.remove();
+  const mr = 16, mt = 12, mb = 28;
+  const t0 = new Date(rows[0].date).getTime();
+  const t1 = rows.length > 1 ? new Date(rows[rows.length - 1].date).getTime() : t0 + 7 * 864e5;
+  const x = (d) => ml + (new Date(d).getTime() - t0) / (t1 - t0) * (W - ml - mr);
+  const y = (v) => mt + (max - v) / (max - min) * (H - mt - mb);
+  const grid = css('--line'), muted = css('--muted'), acc = css('--accent'), ref = css('--ref');
+  ticks.forEach((v) => {
+    el('line', { x1: ml, x2: W - mr, y1: y(v), y2: y(v), stroke: grid });
+    el('text', { x: ml - 8, y: y(v), dy: '0.32em', 'text-anchor': 'end', 'font-size': 12, fill: muted }, fmtv(Math.round(v)));
+  });
+  const nx = Math.max(2, Math.min(6, Math.floor(W / 110)));
+  for (let i = 0; i < nx; i++) {
+    const tt = t0 + (t1 - t0) * i / (nx - 1); const d = new Date(tt);
+    el('text', { x: x(d), y: H - 8, 'text-anchor': i === 0 ? 'start' : i === nx - 1 ? 'end' : 'middle', 'font-size': 12, fill: muted }, `${d.getUTCMonth() + 1}/${d.getUTCDate()}`);
+  }
+  if (opt.target != null) el('line', { x1: ml, x2: W - mr, y1: y(opt.target), y2: y(opt.target), stroke: ref, 'stroke-dasharray': '4 4' });
+  el('path', { d: rows.map((r, i) => (i ? 'L' : 'M') + x(r.date) + ',' + y(r.p)).join(''), fill: 'none', stroke: acc, 'stroke-width': 2, 'stroke-linecap': 'round', 'stroke-linejoin': 'round' });
+  rows.forEach((r) => el('circle', { cx: x(r.date), cy: y(r.p), r: rows.length > 30 ? 2 : 4, fill: acc }));
+  const tip = document.createElement('div'); tip.className = 'tip'; tip.hidden = true; box.append(tip);
+  svg.addEventListener('pointermove', (ev) => {
+    const rect = svg.getBoundingClientRect(); const k = rect.width / W; const mx = (ev.clientX - rect.left) / k;
+    let best = rows[0]; rows.forEach((r) => { if (Math.abs(x(r.date) - mx) < Math.abs(x(best.date) - mx)) best = r; });
+    tip.replaceChildren(Object.assign(document.createElement('div'), { className: 'd', textContent: best.date }), Object.assign(document.createElement('div'), { textContent: opt.label + ' ' + fmtv(best.p) }));
+    tip.hidden = false;
+    tip.style.left = Math.min(Math.max(x(best.date) * k - 60, 0), rect.width - 150) + 'px';
+    tip.style.top = Math.max(y(best.p) * k - 56, 0) + 'px';
+  });
+  svg.addEventListener('pointerleave', () => { tip.hidden = true; });
+}
+
+let DATA = [];
+function render() {
+  const rows = DATA.map((r) => ({ ...r, date: String(r.date).slice(0, 10), p: Number(r.etihad) })).filter((r) => r.p > 0).sort((a, b) => a.date < b.date ? -1 : 1);
+  if (!rows.length) { $('sigt').textContent = '還沒有紀錄'; return; }
+  const st = stats(rows);
+  $('sig').dataset.s = st.s; $('sigt').textContent = st.t;
+  $('cur').textContent = nt(st.cur.p); $('curd').textContent = st.cur.date;
+  $('low').textContent = nt(st.lo.p); $('lowd').textContent = st.lo.date;
+  $('high').textContent = nt(st.hi.p); $('highd').textContent = st.hi.date;
+  $('tot').textContent = nt(st.cur.p * 3); $('days').textContent = rows.length;
+  $('upd').textContent = st.cur.date;
+  const today = new Date(Date.now() + 8 * 3600e3).toISOString().slice(0, 10);
+  const lag = Math.round((new Date(today) - new Date(st.cur.date)) / 864e5);
+  $('age').textContent = lag <= 0 ? '今天已更新' : lag === 1 ? '最新紀錄是昨天，今天下午 2 點多更新' : `最新紀錄是 ${lag} 天前，可能有幾天沒查到價格`;
+  const tb = $('rows'); tb.replaceChildren();
+  DATA.slice().sort((a, b) => a.date < b.date ? 1 : -1).forEach((r) => {
+    const tr = document.createElement('tr');
+    [[String(r.date).slice(0, 10), ''], [r.etihad ? nt(r.etihad) : '—', 'n'], [r.cheapest ? nt(r.cheapest) : '—', 'n hn'], [r.cheapest_airline || '—', 'hn'], [r.gf_a ? ca(r.gf_a) : '—', 'n hn'], [r.gf_b_out ? ca(r.gf_b_out) + ' / ' + (r.gf_b_ret ? nt(r.gf_b_ret) : '—') : '—', 'n hn'], [r.note || '', 'hn']].forEach(([t, c]) => {
+      const td = document.createElement('td'); td.textContent = t; if (c) td.className = c; tr.append(td);
+    });
+    tb.append(tr);
+  });
+  drawChart(rows);
+  const all = DATA.map((r) => ({ ...r, date: String(r.date).slice(0, 10) })).sort((a, b) => a.date < b.date ? -1 : 1);
+  const series = (k) => all.filter((r) => Number(r[k]) > 0).map((r) => ({ ...r, p: Number(r[k]) }));
+  const A = series('gf_a'), B = series('gf_b_out'), R = series('gf_b_ret');
+  const lowOf = (xs) => xs.reduce((m, r) => (r.p < m.p ? r : m), xs[0]);
+  if (A.length) { const c = A[A.length - 1], l = lowOf(A); $('ga').textContent = ca(c.p); $('gad').textContent = `${c.date} · ${c.gf_a_airline || ''} · 追蹤最低 ${ca(l.p)}（${l.date}）`; }
+  else { $('ga').textContent = '—'; $('gad').textContent = '明天下午開始累積紀錄'; }
+  if (B.length) {
+    const c = B[B.length - 1], l = lowOf(B); const rc = R.length ? R[R.length - 1] : null;
+    $('gb').textContent = ca(c.p) + (rc ? ' ＋ ' + nt(rc.p) : '');
+    $('gbd').textContent = `去程 ${c.gf_b_out_airline || ''} 追蹤最低 ${ca(l.p)}（${l.date}）` + (R.length ? ` · 回程阿提哈德最低 ${nt(lowOf(R).p)}` : '');
+  } else { $('gb').textContent = '—'; $('gbd').textContent = '明天下午開始累積紀錄'; }
+  drawChart(A, { id: 'chartA', fmt: ca, label: '方案 A', target: null, H: 180 });
+  drawChart(B, { id: 'chartB', fmt: ca, label: '去程', target: null, H: 180 });
+}
+fetch('prices.json?v=' + Date.now(), { cache: 'no-store' }).then((r) => r.json()).then((d) => { DATA = Array.isArray(d) ? d : (d.rows || []); render(); }).catch(() => { $('sigt').textContent = '資料讀取失敗，稍後再重新整理'; });
+let rt; addEventListener('resize', () => { clearTimeout(rt); rt = setTimeout(() => DATA.length && render(), 150); });
+matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => DATA.length && render());
+</script>
+</body>
+</html>
