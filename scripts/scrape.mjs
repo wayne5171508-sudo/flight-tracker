@@ -3,6 +3,8 @@ import { chromium } from 'playwright';
 import fs from 'node:fs';
 
 const S = {
+  // 優先追蹤:桃園→多倫多 2026/12/20、多倫多→桃園 12/26 來回(轉機直飛都算),台幣
+  yyz: 'https://www.google.com/travel/flights/search?tfs=CBwQAhoeEgoyMDI2LTEyLTIwagcIARIDVFBFcgcIARIDWVlaGh4SCjIwMjYtMTItMjZqBwgBEgNZWVpyBwgBEgNUUEVAAUgBcAGCAQsI____________AZgBAQ&hl=en&curr=TWD&gl=TW',
   tw: 'https://www.google.com/travel/flights/search?tfs=CBwQAhojEgoyMDI3LTA1LTEwagwIAhIIL20vMGZ0a3hyBwgBEgNMSFIaIxIKMjAyNy0wNS0yM2oHCAESA0NER3IMCAISCC9tLzBmdGt4QAFIAXABggELCP___________wGYAQM&hl=en&curr=TWD&gl=TW',
   gfA: 'https://www.google.com/travel/flights/search?tfs=CBwQAhoeEgoyMDI3LTA1LTEwagcIARIDWVlacgcIARIDTEhSGh4SCjIwMjctMDUtMjNqBwgBEgNDREdyBwgBEgNZWVpAAUgBcAGCAQsI____________AZgBAw&hl=en&curr=CAD&gl=CA',
   gfBout: 'https://www.google.com/travel/flights?q=Flights%20to%20LHR%20from%20YYZ%20on%202027-05-10%20oneway&curr=CAD&hl=en&gl=CA',
@@ -36,7 +38,7 @@ async function results(page, url) {
     const m = lab.match(/flight with (.+?)\./);
     const airline = m ? m[1].replace(/ and /g, ', ') : (dash >= 0 ? (lines[dash + 2] || '') : '');
     const price = num((t.match(/(?:NT|CA)\$[\d,]+/) || ['0'])[0]);
-    return { text: t, airline, price, etihadAuh: /Etihad/.test(t) && /AUH/.test(t) };
+    return { text: t, airline, price, etihadAuh: /Etihad/.test(t) && /AUH/.test(t), nonstop: /\bNonstop\b/i.test(t) };
   }).filter((r) => r.price > 0);
 }
 // Google Flights 偶爾載入失敗(10/19、10/21 都有一半查詢逾時)。每組最多試 3 次,每次換新分頁、間隔拉長。
@@ -66,6 +68,17 @@ const ctx = await browser.newContext({ locale: 'en-US', userAgent: 'Mozilla/5.0 
 const row = { date: today, note: 'GitHub 自動查價' };
 const notes = [];
 
+// 12 月多倫多來回:出發日 12/20 之後就不用查了
+if (today <= '2026-12-20') {
+  try {
+    const r = await resultsRetry(ctx, S.yyz, 'yyz');
+    const c = cheapest(r);
+    const n = cheapest(r.filter((x) => x.nonstop));
+    if (c) { row.yyz_dec = c.price; row.yyz_dec_airline = c.airline; row.yyz_dec_stops = c.nonstop ? '直飛' : '轉機'; }
+    if (n) { row.yyz_dec_nonstop = n.price; row.yyz_dec_nonstop_airline = n.airline; }
+  } catch (err) { notes.push('多倫多查詢失敗'); console.error('yyz', err.message); }
+}
+
 try {
   const r = await resultsRetry(ctx, S.tw, 'tw');
   const e = cheapest(r.filter((x) => x.etihadAuh));
@@ -90,7 +103,7 @@ await browser.close();
 if (notes.length) row.note += '；' + notes.join('；');
 console.log(JSON.stringify(row));
 
-if (!row.etihad && !row.cheapest && !row.gf_a && !row.gf_b_out && !row.gf_b_ret) {
+if (!row.yyz_dec && !row.etihad && !row.cheapest && !row.gf_a && !row.gf_b_out && !row.gf_b_ret) {
   console.error('No prices found; not writing.');
   process.exit(1);
 }
@@ -101,13 +114,13 @@ if (i >= 0) {
   // 同一天跑第二次(手動補跑):這次失敗的組別保留稍早成功的價格,備註也不要寫成「查詢失敗」
   const prev = data[i];
   const kept = [];
-  for (const [f, label] of [['etihad', '台灣組'], ['gf_a', 'gfA'], ['gf_b_out', 'gfBout'], ['gf_b_ret', 'gfBret']]) {
+  for (const [f, label] of [['yyz_dec', '多倫多'], ['etihad', '台灣組'], ['gf_a', 'gfA'], ['gf_b_out', 'gfBout'], ['gf_b_ret', 'gfBret']]) {
     if (row[f] == null && prev[f] != null) kept.push(label);
   }
   data[i] = { ...prev, ...row };
   if (kept.length) {
     let note = row.note;
-    for (const k of kept) note = note.replace('；' + (k === '台灣組' ? '台灣組查詢失敗' : k + ' 查詢失敗'), '');
+    for (const k of kept) note = note.replace('；' + (k === '台灣組' ? '台灣組查詢失敗' : k === '多倫多' ? '多倫多查詢失敗' : k + ' 查詢失敗'), '');
     data[i].note = note + '；' + kept.join('、') + '沿用今天稍早的價格';
   }
 } else data.push(row);
