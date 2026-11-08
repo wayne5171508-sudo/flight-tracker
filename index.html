@@ -160,11 +160,30 @@ footer{font-size:12px;color:var(--muted);text-align:center}
     </div>
   </section>
 
+  <section class="card" id="yzj">
+    <div class="top">
+      <div class="route"><span class="num">4</span><b>桃園</b><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M4 9h15l-4-4M20 15H5l4 4"/></svg><b>多倫多</b><span class="d">12/27 去 · 1/9 回</span></div>
+      <span class="tag">來回</span>
+    </div>
+    <p class="price"><span id="yzj-cur">—</span><small>每人含稅</small></p>
+    <div class="line2"><span class="chg" id="yzj-chg">—</span><span class="muted" id="yzj-air">—</span></div>
+    <div class="facts">
+      <div class="fact"><p class="k">直飛最低</p><p class="v" id="yzj-ns">—</p></div>
+      <div class="fact"><p class="k">直飛航空</p><p class="v" id="yzj-nsa">—</p></div>
+      <div class="fact"><p class="k">追蹤最低</p><p class="v" id="yzj-low">—</p></div>
+      <div class="fact"><p class="k">追蹤最高</p><p class="v" id="yzj-high">—</p></div>
+    </div>
+    <div class="spark" id="yzj-spark"></div>
+    <div class="btns">
+      <a class="btn" href="https://www.google.com/travel/flights/search?tfs=CBwQAhoeEgoyMDI2LTEyLTI3agcIARIDVFBFcgcIARIDWVlaGh4SCjIwMjctMDEtMDlqBwgBEgNZWVpyBwgBEgNUUEVAAUgBcAGCAQsI____________AZgBAQ&amp;hl=zh-TW&amp;curr=TWD" target="_blank" rel="noopener">看即時票價</a>
+    </div>
+  </section>
+
   <!-- 每日紀錄 -->
   <section class="card">
     <h2>每日紀錄</h2>
     <table>
-      <thead><tr><th>日期</th><th>①<br>NT$</th><th>②<br>CA$</th><th>③<br>NT$</th></tr></thead>
+      <thead><tr><th>日期</th><th>①<br>NT$</th><th>②<br>CA$</th><th>③<br>NT$</th><th>④<br>NT$</th></tr></thead>
       <tbody id="rows"></tbody>
     </table>
     <button class="more" id="more" type="button" hidden>看全部紀錄</button>
@@ -247,6 +266,21 @@ function spark(box, s, u, target) {
   svg.addEventListener('pointerleave', () => { tip.hidden = true; });
 }
 
+function roundTrip(all, id, f) {
+  const sm = summary(series(all, f));
+  if (sm) {
+    const r = sm.cur.r;
+    $(id + '-cur').textContent = fmt('NT$', sm.cur.p);
+    $(id + '-air').textContent = [r[f + '_airline'], r[f + '_stops']].filter(Boolean).join(' · ');
+    $(id + '-ns').textContent = Number(r[f + '_nonstop']) > 0 ? fmt('NT$', r[f + '_nonstop']) : '今天沒查到';
+    $(id + '-nsa').textContent = r[f + '_nonstop_airline'] || '—';
+    $(id + '-low').textContent = fmt('NT$', sm.low);
+    $(id + '-high').textContent = fmt('NT$', sm.high);
+  }
+  setChg($(id + '-chg'), 'NT$', sm);
+  spark($(id + '-spark'), series(all, f), 'NT$');
+}
+
 function render() {
   const all = DATA.map((r) => ({ ...r, date: String(r.date).slice(0, 10) })).sort((a, b) => a.date < b.date ? -1 : 1);
   if (!all.length) { $('age').textContent = '還沒有紀錄'; return; }
@@ -288,19 +322,9 @@ function render() {
   setChg($('gfa-chg'), 'CA$', ga);
   spark($('gfa-spark'), series(all, 'gf_a'), 'CA$');
 
-  // ③
-  const yz = summary(series(all, 'yyz_dec'));
-  if (yz) {
-    const r = yz.cur.r;
-    $('yyz-cur').textContent = fmt('NT$', yz.cur.p);
-    $('yyz-air').textContent = [r.yyz_dec_airline, r.yyz_dec_stops].filter(Boolean).join(' · ');
-    $('yyz-ns').textContent = Number(r.yyz_dec_nonstop) > 0 ? fmt('NT$', r.yyz_dec_nonstop) : '今天沒查到';
-    $('yyz-nsa').textContent = r.yyz_dec_nonstop_airline || '—';
-    $('yyz-low').textContent = fmt('NT$', yz.low);
-    $('yyz-high').textContent = fmt('NT$', yz.high);
-  }
-  setChg($('yyz-chg'), 'NT$', yz);
-  spark($('yyz-spark'), series(all, 'yyz_dec'), 'NT$');
+  // ③ ④ 台灣多倫多來回
+  roundTrip(all, 'yyz', 'yyz_dec');
+  roundTrip(all, 'yzj', 'yyz_jan');
 
   // 每日紀錄
   const recent = all.slice().reverse();
@@ -310,7 +334,7 @@ function render() {
   const tb = $('rows'); tb.replaceChildren();
   shown.forEach((r) => {
     const tr = document.createElement('tr');
-    [r.date, n(r.etihad), n(r.gf_a), n(r.yyz_dec)].forEach((t) => { const td = document.createElement('td'); td.textContent = t; tr.append(td); });
+    [r.date, n(r.etihad), n(r.gf_a), n(r.yyz_dec), n(r.yyz_jan)].forEach((t) => { const td = document.createElement('td'); td.textContent = t; tr.append(td); });
     tb.append(tr);
   });
 }
