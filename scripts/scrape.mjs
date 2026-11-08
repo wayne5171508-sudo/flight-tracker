@@ -30,10 +30,27 @@ async function results(page, url) {
     await page.waitForTimeout(1500);
   }
   await page.waitForTimeout(3000);
-  const items = await page.$$eval('li', (lis) => lis.map((li) => {
+  const grab = () => page.$$eval('li', (lis) => lis.map((li) => {
     const lab = [...li.querySelectorAll('[aria-label]')].map((e) => e.getAttribute('aria-label')).find((a) => /flight with /.test(a)) || '';
     return { t: li.innerText, lab };
   }).filter(({ t }) => /(NT|CA)\$[\d,]+/.test(t) && /\d+ hr/.test(t)));
+  // 預設「Best」分頁會藏掉較便宜但轉機麻煩的票(11/8 實測 12/27 多倫多 Best 最低 50,443、Cheapest 36,099)。
+  // 先讀 Best,再點「Cheapest」分頁讀一次,兩邊合併後才取最低價。
+  const items = await grab();
+  try {
+    const tab = page.getByRole('tab', { name: /^Cheapest/ });
+    if (await tab.count()) {
+      await tab.first().click();
+      const t1 = Date.now();
+      while (Date.now() - t1 < 30000) {
+        await page.waitForTimeout(2000);
+        const busy = await page.evaluate(() => /Fetching results|Loading results/.test(document.querySelector('[role=tabpanel]:not([hidden])')?.innerText || '')).catch(() => false);
+        if (!busy) break;
+      }
+      await page.waitForTimeout(2000);
+      items.push(...(await grab()));
+    } else console.error('no Cheapest tab');
+  } catch (err) { console.error('cheapest tab', err.message); }
   return items.map(({ t, lab }) => {
     const lines = t.split('\n').map((x) => x.trim()).filter(Boolean);
     const dash = lines.findIndex((x) => x === '–' || x === '-');
