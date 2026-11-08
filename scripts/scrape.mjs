@@ -95,6 +95,7 @@ for (const [key, url, until, f, label] of [
   if (today > until) continue;
   try {
     const r = await resultsRetry(ctx, url, key);
+    console.error(key, 'prices seen', [...new Set(r.map((x) => x.price))].sort((a, b) => a - b).slice(0, 8).join(','), '| top:', (r[0] && r[0].text || '').replace(/\n/g, ' ').slice(0, 160));
     const c = cheapest(r);
     const n = cheapest(r.filter((x) => x.nonstop));
     if (c) { row[f] = c.price; row[f + '_airline'] = c.airline; row[f + '_stops'] = c.nonstop ? '直飛' : '轉機'; }
