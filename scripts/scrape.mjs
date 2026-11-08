@@ -40,12 +40,30 @@ async function results(page, url) {
   if (url.includes('tfs=')) {
     try {
       await page.goto(url + '&tfu=EgoIABAAGAAgAigB', { waitUntil: 'domcontentloaded', timeout: 60000 });
+      // 等「Cheapest」分頁被選中、而且它自己的結果載完(不再顯示 Fetching/Finding)才讀
+      const panelState = () => page.evaluate(() => {
+        const tab = [...document.querySelectorAll('[role=tab]')].find((t) => /^Cheapest/.test(t.innerText.trim()));
+        const sel = tab && tab.getAttribute('aria-selected') === 'true';
+        const panel = [...document.querySelectorAll('[role=tabpanel]')].find((p) => !p.hidden && p.offsetParent !== null);
+        const txt = panel ? panel.innerText : '';
+        return { sel: !!sel, busy: /Fetching results|Finding the cheapest|Loading results/.test(txt), priced: /(NT|CA)\$[\d,]+/.test(txt) && /\d+ hr/.test(txt), tabText: tab ? tab.innerText.replace(/\s+/g, ' ').slice(0, 60) : null };
+      }).catch(() => ({}));
       const t1 = Date.now();
-      while (!(await ready())) {
-        if (Date.now() - t1 > 45000) throw new Error('timeout waiting for cheapest prices');
-        await page.waitForTimeout(1500);
+      let st = {};
+      while (Date.now() - t1 < 60000) {
+        st = await panelState();
+        if (st.sel && st.priced && !st.busy) break;
+        await page.waitForTimeout(2000);
       }
-      await page.waitForTimeout(3000);
+      console.error('cheapest state', JSON.stringify(st), Math.round((Date.now() - t1) / 1000) + 's');
+      await page.waitForTimeout(2000);
+      const grabVisible = () => page.$$eval('[role=tabpanel] li', (lis) => lis.filter((li) => li.offsetParent !== null).map((li) => {
+        const lab = [...li.querySelectorAll('[aria-label]')].map((e) => e.getAttribute('aria-label')).find((a) => /flight with /.test(a)) || '';
+        return { t: li.innerText, lab };
+      }).filter(({ t }) => /(NT|CA)\$[\d,]+/.test(t) && /\d+ hr/.test(t)));
+      const vis = await grabVisible().catch(() => []);
+      console.error('cheapest visible rows', vis.length, vis.slice(0, 3).map((v) => (v.t.match(/(?:NT|CA)\$[\d,]+/) || [''])[0]).join(','));
+      items.push(...vis);
       const more = await grab();
       console.error('cheapest view rows', more.length);
       items.push(...more);
