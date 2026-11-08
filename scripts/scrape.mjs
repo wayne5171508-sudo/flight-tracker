@@ -50,9 +50,10 @@ async function results(page, url) {
       }).catch(() => ({}));
       const t1 = Date.now();
       let st = {};
-      while (Date.now() - t1 < 60000) {
+      while (Date.now() - t1 < 90000) {
         st = await panelState();
-        if (st.sel && st.priced && !st.busy) break;
+        if (st.tabText === null && Date.now() - t1 > 15000) break; // 這個搜尋沒有 Best/Cheapest 分頁(例如多城市)
+        if (st.sel && st.priced && !st.busy && /(NT|CA)\$[\d,]+/.test(st.tabText || '')) break;
         await page.waitForTimeout(2000);
       }
       console.error('cheapest state', JSON.stringify(st), Math.round((Date.now() - t1) / 1000) + 's');
