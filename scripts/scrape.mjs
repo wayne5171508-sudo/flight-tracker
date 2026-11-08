@@ -102,7 +102,7 @@ const cheapest = (rs) => rs.reduce((m, r) => (!m || r.price < m.price ? r : m), 
 
 const today = new Date(Date.now() + 8 * 3600e3).toISOString().slice(0, 10);
 const browser = await chromium.launch();
-const ctx = await browser.newContext({ locale: 'zh-TW', timezoneId: 'Asia/Taipei', geolocation: { latitude: 25.033, longitude: 121.565 }, permissions: ['geolocation'], extraHTTPHeaders: { 'Accept-Language': 'zh-TW,zh;q=0.9,en;q=0.8' }, userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36' });
+const ctx = await browser.newContext({ locale: 'en-US', userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36' });
 const row = { date: today, note: 'GitHub 自動查價' };
 const notes = [];
 
