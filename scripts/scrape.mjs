@@ -35,22 +35,22 @@ async function results(page, url) {
     return { t: li.innerText, lab };
   }).filter(({ t }) => /(NT|CA)\$[\d,]+/.test(t) && /\d+ hr/.test(t)));
   // 預設「Best」分頁會藏掉較便宜但轉機麻煩的票(11/8 實測 12/27 多倫多 Best 最低 50,443、Cheapest 36,099)。
-  // 先讀 Best,再點「Cheapest」分頁讀一次,兩邊合併後才取最低價。
+  // 先讀 Best,再直接開「Cheapest」分頁的網址(tfu 參數,點分頁時 Google 自己加的)讀一次,兩邊合併後才取最低價。
   const items = await grab();
-  try {
-    const tab = page.getByRole('tab', { name: /^Cheapest/ });
-    if (await tab.count()) {
-      await tab.first().click();
+  if (url.includes('tfs=')) {
+    try {
+      await page.goto(url + '&tfu=EgoIABAAGAAgAigB', { waitUntil: 'domcontentloaded', timeout: 60000 });
       const t1 = Date.now();
-      while (Date.now() - t1 < 30000) {
-        await page.waitForTimeout(2000);
-        const busy = await page.evaluate(() => /Fetching results|Loading results/.test(document.querySelector('[role=tabpanel]:not([hidden])')?.innerText || '')).catch(() => false);
-        if (!busy) break;
+      while (!(await ready())) {
+        if (Date.now() - t1 > 45000) throw new Error('timeout waiting for cheapest prices');
+        await page.waitForTimeout(1500);
       }
-      await page.waitForTimeout(2000);
-      items.push(...(await grab()));
-    } else console.error('no Cheapest tab');
-  } catch (err) { console.error('cheapest tab', err.message); }
+      await page.waitForTimeout(3000);
+      const more = await grab();
+      console.error('cheapest view rows', more.length);
+      items.push(...more);
+    } catch (err) { console.error('cheapest view', err.message); }
+  }
   return items.map(({ t, lab }) => {
     const lines = t.split('\n').map((x) => x.trim()).filter(Boolean);
     const dash = lines.findIndex((x) => x === '–' || x === '-');
